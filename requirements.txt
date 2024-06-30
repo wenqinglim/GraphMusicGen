@@ -1,8 +1,8 @@
 --find-links https://download.pytorch.org/whl/torch_stable.html
---find-links https://data.pyg.org/whl/torch-1.7.0+cu101.html
+--find-links https://data.pyg.org/whl/torch-1.7.0+cu110.html
 
 # PyTorch related
-torch==1.7.0+cu101
+torch==1.7.0+cu110  # Note: changed cuda to 11.0 for nvidia gpu compatibility
 torchvision==0.8.0
 torch-geometric==2.0.2
 torch-cluster==1.5.9
