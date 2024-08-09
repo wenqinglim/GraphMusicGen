@@ -1,16 +1,27 @@
 from enum import Enum
 
 
-N_TRACKS = 4
-TRACKS = ['Drums', 'Bass', 'Guitar', 'Strings']
+N_TRACKS = 3
+# TRACKS = ['Drums', 'Bass', 'Guitar', 'Strings']
+
+TRACKS = ['Melody', 'Bridge', 'Piano']
+
+MAX_PHRASE_LEN = 8
+
 
 # These defaults, which should not be changed, are set when the related 
 # variables in the YAML config file are not set. 
+# DEFAULT_MIDI_PROGRAMS = {
+#     'Drums': -1,
+#     'Bass': 34,
+#     'Guitar': 1,
+#     'Strings': 83,
+# }
+
 DEFAULT_MIDI_PROGRAMS = {
-    'Drums': -1,
-    'Bass': 34,
-    'Guitar': 1,
-    'Strings': 83,
+    'Melody': 0,
+    'Bridge': 0,
+    'Piano': 0,
 }
 DEFAULT_SOUNDFONT_PATH = '/usr/share/soundfonts/FluidR3_GM.sf2'
 
