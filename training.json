@@ -5,7 +5,7 @@
         "batch_norm": true,
         "gnn_n_layers": 8,
         "d": 512,
-        "n_bars": 2,
+        "n_bars": 8,
         "resolution": 8
     },
     "optimizer": {

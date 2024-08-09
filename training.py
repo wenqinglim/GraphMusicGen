@@ -138,6 +138,7 @@ class PolyphemusTrainer():
                     # Forward pass to obtain mu, log(sigma^2), computed by the
                     # encoder, and structure and content logits, computed by the
                     # decoder
+                    # print(s_logits.shape)
                     (s_logits, c_logits), mu, log_var = self.model(graph)
 
                     # Compute losses
@@ -175,7 +176,7 @@ class PolyphemusTrainer():
                 accs = self._accuracies(
                     s_tensor, s_logits,
                     c_tensor, c_logits,
-                    graph.is_drum
+                    # graph.is_drum
                 )
 
                 # Update the stats
@@ -275,7 +276,7 @@ class PolyphemusTrainer():
                 accs_b = self._accuracies(
                     s_tensor, s_logits,
                     c_tensor, c_logits,
-                    graph.is_drum
+                    # graph.is_drum
                 )
 
                 # Save losses and accuracies
@@ -346,7 +347,9 @@ class PolyphemusTrainer():
 
         return tot_loss, losses
 
-    def _accuracies(self, s_tensor, s_logits, c_tensor, c_logits, is_drum):
+    def _accuracies(self, s_tensor, s_logits, c_tensor, c_logits, 
+                    # is_drum
+                   ):
 
         # Do not consider SOS token
         c_tensor = c_tensor[..., 1:, :]
@@ -361,12 +364,12 @@ class PolyphemusTrainer():
         pitch_acc = self._pitch_accuracy(c_logits, c_tensor)
 
         # Compute pitch accuracies for drums and non drums separately
-        pitch_acc_drums = self._pitch_accuracy(
-            c_logits, c_tensor, drums=True, is_drum=is_drum
-        )
-        pitch_acc_non_drums = self._pitch_accuracy(
-            c_logits, c_tensor, drums=False, is_drum=is_drum
-        )
+        # pitch_acc_drums = self._pitch_accuracy(
+        #     c_logits, c_tensor, drums=True, is_drum=is_drum
+        # )
+        # pitch_acc_non_drums = self._pitch_accuracy(
+        #     c_logits, c_tensor, drums=False, is_drum=is_drum
+        # )
 
         dur_acc = self._duration_accuracy(c_logits, c_tensor)
 
@@ -378,8 +381,8 @@ class PolyphemusTrainer():
         accs = {
             'note': note_acc.item(),
             'pitch': pitch_acc.item(),
-            'pitch_drums': pitch_acc_drums.item(),
-            'pitch_non_drums': pitch_acc_non_drums.item(),
+            # 'pitch_drums': pitch_acc_drums.item(),
+            # 'pitch_non_drums': pitch_acc_non_drums.item(),
             'dur': dur_acc.item(),
             's_acc': s_acc.item(),
             's_precision': s_precision.item(),

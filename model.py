@@ -218,12 +218,15 @@ class CNNEncoder(nn.Module):
         if batch_norm:
             self.conv = nn.Sequential(
                 # From (4 x 32) to (8 x 4 x 32)
+                # (3 x 32) to (8 x 3 x 32)
                 nn.Conv2d(1, 8, 3, padding=1),
                 nn.BatchNorm2d(8),
                 nn.ReLU(True),
                 # From (8 x 4 x 32) to (8 x 4 x 8)
+                # (8 x 3 x 32) to (8 x 3 x 8)
                 nn.MaxPool2d((1, 4), stride=(1, 4)),
                 # From (8 x 4 x 8) to (16 x 4 x 8)
+                # (8 x 3 x 8) to (16 x 3 x 8)
                 nn.Conv2d(8, 16, 3, padding=1),
                 nn.BatchNorm2d(16),
                 nn.ReLU(True)
@@ -242,7 +245,8 @@ class CNNEncoder(nn.Module):
         # Linear layers
         self.lin = nn.Sequential(
             nn.Dropout(dropout),
-            nn.Linear(16 * 4 * 8, dense_dim),
+            # nn.Linear(16 * 4 * 8, dense_dim),
+            nn.Linear(16 * constants.N_TRACKS * 8, dense_dim),
             nn.ReLU(True),
             nn.Dropout(dropout),
             nn.Linear(dense_dim, output_dim)
@@ -250,7 +254,11 @@ class CNNEncoder(nn.Module):
 
     def forward(self, x):
         x = x.unsqueeze(1)
-        x = self.conv(x)
+        # print(f"Shape bef conv: {x.shape}")
+
+        x = self.conv(x) # 1536 x 16 x 4 x 8
+        # print(f"Shape after conv: {x.shape}")
+
         x = self.flatten(x)
         x = self.lin(x)
         return x
@@ -268,11 +276,12 @@ class CNNDecoder(nn.Module):
             nn.Linear(input_dim, dense_dim),
             nn.ReLU(True),
             nn.Dropout(dropout),
-            nn.Linear(dense_dim, 16 * 4 * 8),
+            # nn.Linear(dense_dim, 16 * 4 * 8),
+            nn.Linear(dense_dim, 16 * constants.N_TRACKS * 8),
             nn.ReLU(True)
         )
 
-        self.unflatten = nn.Unflatten(dim=1, unflattened_size=(16, 4, 8))
+        self.unflatten = nn.Unflatten(dim=1, unflattened_size=(16, constants.N_TRACKS, 8))
 
         # Upsample and convolutional layers
         if batch_norm:
@@ -311,12 +320,12 @@ class ContentEncoder(nn.Module):
         # and non drums)
         self.non_drums_pitch_emb = nn.Linear(constants.N_PITCH_TOKENS, 
                                              self.d//2)
-        self.drums_pitch_emb = nn.Linear(constants.N_PITCH_TOKENS, self.d//2)
+        # self.drums_pitch_emb = nn.Linear(constants.N_PITCH_TOKENS, self.d//2)
         self.dur_emb = nn.Linear(constants.N_DUR_TOKENS, self.d//2)
 
         # Batch norm layers
         self.bn_non_drums = nn.BatchNorm1d(num_features=self.d//2)
-        self.bn_drums = nn.BatchNorm1d(num_features=self.d//2)
+        # self.bn_drums = nn.BatchNorm1d(num_features=self.d//2)
         self.bn_dur = nn.BatchNorm1d(num_features=self.d//2)
 
         self.chord_encoder = nn.Linear(
@@ -344,24 +353,26 @@ class ContentEncoder(nn.Module):
     def forward(self, graph):
         
         c_tensor = graph.c_tensor
+        # print(f"c_tensor shape: {c_tensor.shape}")
 
         # Discard SOS token
         c_tensor = c_tensor[:, 1:, :]
 
         # Get drums and non drums tensors
-        drums = c_tensor[graph.is_drum]
-        non_drums = c_tensor[torch.logical_not(graph.is_drum)]
+        # drums = c_tensor[graph.is_drum]
+        # non_drums = c_tensor[torch.logical_not(graph.is_drum)]
+        non_drums = c_tensor
 
         # Compute drums embeddings
-        sz = drums.size()
-        drums_pitch = self.drums_pitch_emb(
-            drums[..., :constants.N_PITCH_TOKENS])
-        drums_pitch = self.bn_drums(drums_pitch.view(-1, self.d//2))
-        drums_pitch = drums_pitch.view(sz[0], sz[1], self.d//2)
-        drums_dur = self.dur_emb(drums[..., constants.N_PITCH_TOKENS:])
-        drums_dur = self.bn_dur(drums_dur.view(-1, self.d//2))
-        drums_dur = drums_dur.view(sz[0], sz[1], self.d//2)
-        drums = torch.cat((drums_pitch, drums_dur), dim=-1)
+        # sz = drums.size()
+        # drums_pitch = self.drums_pitch_emb(
+        #     drums[..., :constants.N_PITCH_TOKENS])
+        # drums_pitch = self.bn_drums(drums_pitch.view(-1, self.d//2))
+        # drums_pitch = drums_pitch.view(sz[0], sz[1], self.d//2)
+        # drums_dur = self.dur_emb(drums[..., constants.N_PITCH_TOKENS:])
+        # drums_dur = self.bn_dur(drums_dur.view(-1, self.d//2))
+        # drums_dur = drums_dur.view(sz[0], sz[1], self.d//2)
+        # drums = torch.cat((drums_pitch, drums_dur), dim=-1)
         # n_nodes x MAX_SIMU_TOKENS x d
 
         # Compute non drums embeddings
@@ -378,23 +389,24 @@ class ContentEncoder(nn.Module):
         # n_nodes x MAX_SIMU_TOKENS x d
 
         # Compute chord embeddings (drums and non drums)
-        drums = self.chord_encoder(
-            drums.view(-1, self.d * (constants.MAX_SIMU_TOKENS-1))
-        )
+        # drums = self.chord_encoder(
+        #     drums.view(-1, self.d * (constants.MAX_SIMU_TOKENS-1))
+        # )
         non_drums = self.chord_encoder(
             non_drums.view(-1, self.d * (constants.MAX_SIMU_TOKENS-1))
         )
-        drums = F.relu(drums)
+        # drums = F.relu(drums)
         non_drums = F.relu(non_drums)
-        drums = self.dropout_layer(drums)
+        # drums = self.dropout_layer(drums)
         non_drums = self.dropout_layer(non_drums)
         # n_nodes x d
 
         # Merge drums and non drums
-        out = torch.zeros((c_tensor.size(0), self.d), device=self.device,
-                          dtype=drums.dtype)
-        out[graph.is_drum] = drums
-        out[torch.logical_not(graph.is_drum)] = non_drums
+        # out = torch.zeros((c_tensor.size(0), self.d), device=self.device,
+        #                   dtype=drums.dtype)
+        # out[graph.is_drum] = drums
+        # out[torch.logical_not(graph.is_drum)] = non_drums
+        out = non_drums
         # n_nodes x d
 
         # Set initial graph node states to intermediate chord representations 
@@ -427,17 +439,23 @@ class StructureEncoder(nn.Module):
             dense_dim=self.d,
             output_dim=self.d,
             dropout=self.dropout,
-            batch_norm=self.batch_norm
+            batch_norm=self.batch_norm,
         )
         self.bars_encoder = nn.Linear(self.n_bars * self.d, self.d)
     
     def forward(self, graph):
         
         s_tensor = graph.s_tensor
+        # print(f"s_tensor shape: {s_tensor.shape}") # 2048 x 3 x 32
         out = self.cnn_encoder(s_tensor.view(-1, constants.N_TRACKS,
-                                             self.resolution * 4))
+                                             self.resolution * 4)) # 2048 x 3 x 32
+        
+        # out: 1536 x 512
+        # print(f"out shape: {out.shape}")
         # (bs*n_bars) x d
         out = out.view(-1, self.n_bars * self.d)
+        # print(f"out after reshape: {out.shape}")
+            
         # bs x (n_bars*d)
         z_s = self.bars_encoder(out)
         # bs x d
@@ -465,10 +483,12 @@ class Encoder(nn.Module):
 
     def forward(self, graph):
         
+        # print(f"graph shape: {graph.shape}")
         z_s = self.s_encoder(graph)
         z_c = self.c_encoder(graph)
         
         # Merge content and structure representations
+        print(f"content shape: {z_c.shape}, structure shape: {z_s.shape}")
         z_g = torch.cat((z_c, z_s), dim=1)
         z_g = self.dropout_layer(z_g)
         z_g = self.linear_merge(z_g)
@@ -500,7 +520,9 @@ class StructureDecoder(nn.Module):
     def forward(self, z_s):
         # z_s: bs x d
         out = self.bars_decoder(z_s)  # bs x (n_bars*d)
+        # print(f"structure decoder shape after bars_decoder: {out.shape}")
         out = self.cnn_decoder(out.reshape(-1, self.d))
+        # print(f"structure decoder shape after cnn_decoder: {out.shape}")
         out = out.view(z_s.size(0), self.n_bars, constants.N_TRACKS, -1)
         return out
 
@@ -526,7 +548,7 @@ class ContentDecoder(nn.Module):
             self.d, self.d*(constants.MAX_SIMU_TOKENS-1))
 
         # Pitch and duration (un)embedding linear layers
-        self.drums_pitch_emb = nn.Linear(self.d//2, constants.N_PITCH_TOKENS)
+        # self.drums_pitch_emb = nn.Linear(self.d//2, constants.N_PITCH_TOKENS)
         self.non_drums_pitch_emb = nn.Linear(
             self.d//2, constants.N_PITCH_TOKENS)
         self.dur_emb = nn.Linear(self.d//2, constants.N_DUR_TOKENS)
@@ -549,19 +571,21 @@ class ContentDecoder(nn.Module):
         out = self.chord_decoder(out)  # n_nodes x (MAX_SIMU_TOKENS*d)
         out = out.view(-1, constants.MAX_SIMU_TOKENS-1, self.d)
 
-        drums = out[s.is_drum]  # n_nodes_drums x MAX_SIMU_TOKENS x d
-        non_drums = out[torch.logical_not(s.is_drum)]
-        # n_nodes_non_drums x MAX_SIMU_TOKENS x d
+#         drums = out[s.is_drum]  # n_nodes_drums x MAX_SIMU_TOKENS x d
+#         non_drums = out[torch.logical_not(s.is_drum)]
+        non_drums = out
+#         # n_nodes_non_drums x MAX_SIMU_TOKENS x d
 
         # Obtain final pitch and dur logits (softmax will be applied
         # outside forward)
         non_drums = self.dropout_layer(non_drums)
-        drums = self.dropout_layer(drums)
+#         drums = self.dropout_layer(drums)
+        
 
-        drums_pitch = self.drums_pitch_emb(drums[..., :self.d//2])
-        drums_dur = self.dur_emb(drums[..., self.d//2:])
-        drums = torch.cat((drums_pitch, drums_dur), dim=-1)
-        # n_nodes_drums x MAX_SIMU_TOKENS x d_token
+        # drums_pitch = self.drums_pitch_emb(drums[..., :self.d//2])
+        # drums_dur = self.dur_emb(drums[..., self.d//2:])
+        # drums = torch.cat((drums_pitch, drums_dur), dim=-1)
+        # # n_nodes_drums x MAX_SIMU_TOKENS x d_token
 
         non_drums_pitch = self.non_drums_pitch_emb(non_drums[..., :self.d//2])
         non_drums_dur = self.dur_emb(non_drums[..., self.d//2:])
@@ -569,11 +593,12 @@ class ContentDecoder(nn.Module):
         # n_nodes_non_drums x MAX_SIMU_TOKENS x d_token
 
         # Merge drums and non-drums in the final output tensor
-        d_token = constants.D_TOKEN_PAIR
-        out = torch.zeros((s.num_nodes, constants.MAX_SIMU_TOKENS-1, d_token),
-                          device=self.device, dtype=drums.dtype)
-        out[s.is_drum] = drums
-        out[torch.logical_not(s.is_drum)] = non_drums
+        # d_token = constants.D_TOKEN_PAIR
+        # out = torch.zeros((s.num_nodes, constants.MAX_SIMU_TOKENS-1, d_token),
+        #                   device=self.device, dtype=drums.dtype)
+        # out[s.is_drum] = drums
+        # out[torch.logical_not(s.is_drum)] = non_drums
+        out = non_drums
 
         return out
 

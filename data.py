@@ -182,12 +182,13 @@ def graph_from_tensor(s_tensor):
                    attrs.long()[:, 1] + 1] = 1
 
         node_features = get_track_features(bar)
-        is_drum = node_features[:, 0].bool()
+        # is_drum = node_features[:, 0].bool()
         num_nodes = torch.sum(bar, dtype=torch.long)
 
         bars.append(Data(edge_index=edge_index, edge_attrs=edge_attrs,
                          num_nodes=num_nodes, node_features=node_features,
-                         is_drum=is_drum).to(s_tensor.device))
+                         # is_drum=is_drum
+                        ).to(s_tensor.device))
 
     # Merge the graphs corresponding to different bars into a single big graph
     graph, _, _ = collate(
@@ -225,9 +226,11 @@ class PolyphemusDataset(Dataset):
 
         # From (n_tracks x n_timesteps x ...)
         # to (n_bars x n_tracks x n_timesteps x ...)
+        # print(c_tensor.shape) # 3 x 256 x 16 x 2 --> [3, 8, -1, 16, 2]
         c_tensor = c_tensor.reshape(c_tensor.shape[0], self.n_bars, -1,
                                     c_tensor.shape[2], c_tensor.shape[3])
         c_tensor = c_tensor.permute(1, 0, 2, 3, 4)
+        # 3 x 256 --> 3 x 8 x 32 --> 8 x 3 x 32
         s_tensor = s_tensor.reshape(s_tensor.shape[0], self.n_bars, -1)
         s_tensor = s_tensor.permute(1, 0, 2)
 
