@@ -8,11 +8,17 @@
 # plays accompaniment chords and it can also be intepreted as a 
 # piano/accompaniment track. The strings track typically contains a 
 # lead melody.
+# MIDI_PROGRAMS:
+#   Drums: -1
+#   Bass: 34 # Electric Bass (picked)
+#   Guitar: 4 # Electric Piano 1
+#   Strings: 54 # Synth Voice
+
+
 MIDI_PROGRAMS:
-  Drums: -1
-  Bass: 34 # Electric Bass (picked)
-  Guitar: 4 # Electric Piano 1
-  Strings: 54 # Synth Voice
+  Melody: 0
+  Bridge: 0
+  Piano: 0
 
 # The path of the soundfont file needed to convert MIDI to audio
 SOUNDFONT_PATH: "soundfonts/FluidR3_GM.sf2"
