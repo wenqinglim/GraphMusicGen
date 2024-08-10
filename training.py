@@ -140,6 +140,9 @@ class PolyphemusTrainer():
                     # decoder
                     # print(s_logits.shape)
                     (s_logits, c_logits), mu, log_var = self.model(graph)
+                    
+                    # print(f"Input structure: {s_tensor}")
+                    print(f"Output structure: {s_logits}")
 
                     # Compute losses
                     tot_loss, losses = self._losses(
@@ -305,7 +308,8 @@ class PolyphemusTrainer():
 
         # Reshape logits to match s_tensor dimensions:
         # n_graphs (in batch) x n_tracks x n_timesteps
-        s_logits = s_tensor.reshape(-1, *s_logits.shape[2:])
+        # s_logits = s_tensor.reshape(-1, *s_logits.shape[2:])
+        s_logits = s_logits.reshape(-1, *s_tensor.shape[1:])
 
         # Binary structure tensor loss (binary cross entropy)
         s_loss = self.bce_unreduced(
@@ -356,7 +360,11 @@ class PolyphemusTrainer():
 
         # Reshape logits to match s_tensor dimensions:
         # n_graphs (in batch) x n_tracks x n_timesteps
-        s_logits = s_tensor.reshape(-1, *s_logits.shape[2:])
+        # print(f"s_tensor shape: {s_tensor.shape}")
+        # print(f"s_logits before reshape: {s_logits.shape}")
+        # s_logits = s_tensor.reshape(-1, *s_logits.shape[2:])
+        s_logits = s_logits.reshape(-1, *s_tensor.shape[1:])
+        # print(f"s_logits after reshape: {s_logits.shape}")
 
         # Note accuracy considers both pitches and durations
         note_acc = self._note_accuracy(c_logits, c_tensor)
@@ -471,10 +479,16 @@ class PolyphemusTrainer():
         return note_accuracy
 
     def _structure_accuracy(self, s_logits, s_tensor):
-
+        
+        # print(f"s_tensor: {s_tensor}")
+        # print(f"s_logits bef sigmoid: {s_logits}")
+        
         s_logits = torch.sigmoid(s_logits)
         s_logits[s_logits < 0.5] = 0
         s_logits[s_logits >= 0.5] = 1
+        
+        # print(f"s_logits after sigmoid: {s_logits}")
+        # print(f"sum of matching structure elements: {torch.sum(s_logits == s_tensor)}")
 
         return torch.sum(s_logits == s_tensor) / s_tensor.numel()
 
