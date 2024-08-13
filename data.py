@@ -27,7 +27,11 @@ def get_track_edges(s_tensor, ones_idxs=None, node_labels=None):
 
     if ones_idxs is None:
         # Indices where the binary structure tensor is active
-        ones_idxs = torch.nonzero(s_tensor, as_tuple=True)
+        # print(f"s_tensor: {s_tensor}")
+        # ones_idxs = torch.nonzero(s_tensor, as_tuple=True)
+        # print(f"original: {ones_idxs}")
+        ones_idxs = (s_tensor == 1).nonzero(as_tuple=True)
+        # print(f"masked: {ones_idxs}")
 
     if node_labels is None:
         node_labels = get_node_labels(s_tensor, ones_idxs)
@@ -58,7 +62,8 @@ def get_onset_edges(s_tensor, ones_idxs=None, node_labels=None):
 
     if ones_idxs is None:
         # Indices where the binary structure tensor is active
-        ones_idxs = torch.nonzero(s_tensor, as_tuple=True)
+        # ones_idxs = torch.nonzero(s_tensor, as_tuple=True)
+        ones_idxs = (s_tensor == 1).nonzero(as_tuple=True)
 
     if node_labels is None:
         node_labels = get_node_labels(s_tensor, ones_idxs)
@@ -87,13 +92,18 @@ def get_next_edges(s_tensor, ones_idxs=None, node_labels=None):
 
     if ones_idxs is None:
         # Indices where the binary structure tensor is active
-        ones_idxs = torch.nonzero(s_tensor, as_tuple=True)
+        # ones_idxs = torch.nonzero(s_tensor, as_tuple=True)
+        ones_idxs = (s_tensor == 1).nonzero(as_tuple=True)
 
     if node_labels is None:
         node_labels = get_node_labels(s_tensor, ones_idxs)
 
     # List of active timesteps
-    tss = torch.nonzero(torch.any(s_tensor.bool(), dim=0)).squeeze()
+    # tss = torch.nonzero(torch.any(s_tensor.bool(), dim=0)).squeeze()
+    # print(f"tss original: {tss}")
+    tss = torch.nonzero(torch.any((s_tensor == 1).bool(), dim=0)).squeeze()
+    # print(f"tss mod: {tss}")
+    
     if tss.dim() == 0:
         return torch.tensor([], dtype=torch.long)
 
@@ -124,9 +134,15 @@ def get_next_edges(s_tensor, ones_idxs=None, node_labels=None):
 def get_track_features(s_tensor):
 
     # Indices where the binary structure tensor is active
-    ones_idxs = torch.nonzero(s_tensor)
+    # print(f"s_tensor: {s_tensor}")
+    # ones_idxs = torch.nonzero(s_tensor)
+    # print(f"original: {ones_idxs}")
+    ones_idxs = (s_tensor == 1).nonzero()
+    # print(f"masked: {ones_idxs}")
+    # print(f"n_nodes: {}")
 
     n_nodes = len(ones_idxs)
+    # print(f"n_nodes: {n_nodes}")
     tracks = ones_idxs[:, 0]
     n_tracks = s_tensor.size(0)
 
@@ -149,7 +165,8 @@ def graph_from_tensor(s_tensor):
 
         # If the bar contains no activations, add a fake one to avoid having 
         # to deal with empty graphs
-        if not torch.any(bar):
+        # if not torch.any(bar):
+        if not torch.any(bar==1):
             bar[0, 0] = 1
 
         # Get edges from boolean activations
@@ -172,6 +189,8 @@ def graph_from_tensor(s_tensor):
         # edge_list[:, 2:] contains edge types and timestep distances
         edge_index = (edge_list[:, :2].t().contiguous() if not is_edgeless else
                       torch.LongTensor([[0], [0]]))
+        # print(f"edge_index shape: {edge_index.shape}")
+        # print(f"edge_index: {edge_index.max()}")
         attrs = (edge_list[:, 2:] if not is_edgeless else
                  torch.Tensor([[0, 0]]))
 
@@ -183,12 +202,16 @@ def graph_from_tensor(s_tensor):
 
         node_features = get_track_features(bar)
         # is_drum = node_features[:, 0].bool()
-        num_nodes = torch.sum(bar, dtype=torch.long)
+        # num_nodes = torch.sum(bar, dtype=torch.long)
+        # num_nodes = torch.count_nonzero(bar)
+        num_nodes = torch.sum((bar==1), dtype=torch.long)
+        # print(f"num_nodes: {num_nodes}")
 
         bars.append(Data(edge_index=edge_index, edge_attrs=edge_attrs,
                          num_nodes=num_nodes, node_features=node_features,
                          # is_drum=is_drum
                         ).to(s_tensor.device))
+        # print(f"bar edge_index: {edge_index}, {edge_index.shape}")
 
     # Merge the graphs corresponding to different bars into a single big graph
     graph, _, _ = collate(
@@ -201,6 +224,9 @@ def graph_from_tensor(s_tensor):
     # Change bars assignment vector name (otherwise, Dataloader's collate
     # would overwrite graphs.batch)
     graph.bars = graph.batch
+
+    # print(f"graph edge_index: {graph.edge_index}, {graph.edge_index.shape}")
+    # print(f"graph num_nodes: {graph.num_nodes}")
 
     return graph
 
@@ -222,7 +248,9 @@ class PolyphemusDataset(Dataset):
         sample_path = os.path.join(self.dir, self.files[idx].name)
         data = np.load(sample_path)
         c_tensor = torch.tensor(data["c_tensor"], dtype=torch.long)
-        s_tensor = torch.tensor(data["s_tensor"], dtype=torch.bool)
+        s_tensor = torch.tensor(data["s_tensor"], dtype=torch.int)
+        # print(f"loaded c_tensor shape: {c_tensor.shape}")
+        # print(f"loaded s_tensor shape: {s_tensor.shape}")
 
         # From (n_tracks x n_timesteps x ...)
         # to (n_bars x n_tracks x n_timesteps x ...)
@@ -233,6 +261,8 @@ class PolyphemusDataset(Dataset):
         # 3 x 256 --> 3 x 8 x 32 --> 8 x 3 x 32
         s_tensor = s_tensor.reshape(s_tensor.shape[0], self.n_bars, -1)
         s_tensor = s_tensor.permute(1, 0, 2)
+        # print(f"loaded c_tensor shape: {c_tensor.shape}")
+        # print(f"loaded s_tensor shape: {s_tensor.shape}")
 
         # From decimals to onehot (pitches)
         pitches = c_tensor[..., 0]
@@ -260,15 +290,25 @@ class PolyphemusDataset(Dataset):
 
         # Concatenate pitches and durations
         c_tensor = torch.cat((onehot_p, onehot_d), dim=-1)
+        # print(f"loaded c_tensor shape: {c_tensor.shape}")
 
         # Build graph structure from structure tensor
         graph = graph_from_tensor(s_tensor)
+        # print(f"graph edge indices: {graph.edge_index}")
 
         # Filter silences in order to get a sparse representation
+        # print(f"concat c_tensor shape: {c_tensor.shape}")
         c_tensor = c_tensor.reshape(-1, c_tensor.shape[-2], c_tensor.shape[-1])
-        c_tensor = c_tensor[s_tensor.reshape(-1).bool()]
+        # print(f"reshape c_tensor shape: {c_tensor.shape}")
+        # print(f"reshape c_tensor: {c_tensor}")
+        # print(f"reshape s_tensor bool: {s_tensor.reshape(-1).bool()}")
+        # c_tensor = c_tensor[s_tensor.reshape(-1).bool()]
+        c_tensor = c_tensor[(s_tensor==1).reshape(-1)]
+        # print(f"reshaped bool c_tensor shape: {c_tensor.shape}")
 
         graph.c_tensor = c_tensor
         graph.s_tensor = s_tensor.float()
+        # print(f"processed c_tensor shape: {c_tensor.shape}")
+        # print(f"processed s_tensor shape: {s_tensor.shape}")
 
         return graph

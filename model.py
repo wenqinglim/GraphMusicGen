@@ -156,11 +156,13 @@ class MLP(nn.Module):
         self.p = dropout
 
     def forward(self, x):
+        # print(f"MLP input dim: {x.shape}")
         for layer in self.layers:
             x = F.dropout(x, p=self.p, training=self.training)
             x = layer(x)
             if self.activation:
                 x = F.relu(x)
+        # print(f"MLP output dim: {x.shape}")
         return x
 
 
@@ -197,6 +199,9 @@ class GCN(nn.Module):
 
             residual = x
             x = F.dropout(x, p=self.p, training=self.training)
+            # print(f"input GCN: {x}, {edge_index}, {edge_type}, {edge_attr}")
+            # print(f"edge_index max: {edge_index.max()}, x size: {x.size(0)}")
+            # print(f"edge_type size: {edge_type.shape}, edge_attr size: {edge_attr.shape}")
             x = self.layers[i](x, edge_index, edge_type, edge_attr)
 
             if self.batch_norm:
@@ -354,6 +359,7 @@ class ContentEncoder(nn.Module):
         
         c_tensor = graph.c_tensor
         # print(f"c_tensor shape: {c_tensor.shape}")
+        # print(f"s_tensor: {graph.s_tensor[graph.s_tensor==2]}")
 
         # Discard SOS token
         c_tensor = c_tensor[:, 1:, :]
@@ -414,6 +420,8 @@ class ContentEncoder(nn.Module):
         graph.x = out
         graph.distinct_bars = graph.bars + self.n_bars*graph.batch
         out = self.graph_encoder(graph)
+        # print(f"out shape after graph enc: {out.shape}")
+        # print(f"graph.distinct_bars: {graph.distinct_bars[-1].item()}")
         # n_nodes x d
 
         # Aggregate final node states into bar encodings with soft attention
@@ -488,7 +496,7 @@ class Encoder(nn.Module):
         z_c = self.c_encoder(graph)
         
         # Merge content and structure representations
-        print(f"content shape: {z_c.shape}, structure shape: {z_s.shape}")
+        # print(f"content shape: {z_c.shape}, structure shape: {z_s.shape}")
         z_g = torch.cat((z_c, z_s), dim=1)
         z_g = self.dropout_layer(z_g)
         z_g = self.linear_merge(z_g)
@@ -564,6 +572,7 @@ class ContentDecoder(nn.Module):
         s.distinct_bars = s.bars + self.n_bars*s.batch
         _, counts = torch.unique(s.distinct_bars, return_counts=True)
         out = out.view(-1, self.d)
+        # print(f"out shape: {out.shape}")
         out = torch.repeat_interleave(out, counts, axis=0)  # n_nodes x d
         s.x = out
         out = self.graph_decoder(s)  # n_nodes x d
@@ -632,7 +641,7 @@ class Decoder(nn.Module):
         return s
 
     def _binary_from_logits(self, s_logits):
-
+        
         # Hard threshold instead of sampling gives more pleasant results
         s_tensor = torch.sigmoid(s_logits)
         s_tensor[s_tensor >= self.sigmoid_thresh] = 1

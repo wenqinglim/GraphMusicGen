@@ -133,6 +133,8 @@ class PolyphemusTrainer():
                 # represents a bar in the original sequence.
                 graph = graph.to(self.device)
                 s_tensor, c_tensor = graph.s_tensor, graph.c_tensor
+                # print(f"c_tensor input shape: {c_tensor.shape}")
+                # print(f"s_tensor input shape: {s_tensor.shape}")
 
                 with torch.cuda.amp.autocast(enabled=self.cuda):
                     # Forward pass to obtain mu, log(sigma^2), computed by the
@@ -142,7 +144,7 @@ class PolyphemusTrainer():
                     (s_logits, c_logits), mu, log_var = self.model(graph)
                     
                     # print(f"Input structure: {s_tensor}")
-                    print(f"Output structure: {s_logits}")
+                    # print(f"Output structure: {s_logits}")
 
                     # Compute losses
                     tot_loss, losses = self._losses(
@@ -312,9 +314,12 @@ class PolyphemusTrainer():
         s_logits = s_logits.reshape(-1, *s_tensor.shape[1:])
 
         # Binary structure tensor loss (binary cross entropy)
-        s_loss = self.bce_unreduced(
+        # s_loss = self.bce_unreduced(
+        #     s_logits.view(-1), s_tensor.view(-1).float())
+        # s_loss = torch.mean(s_loss)
+        
+        s_loss = self._masked_bce_loss(
             s_logits.view(-1), s_tensor.view(-1).float())
-        s_loss = torch.mean(s_loss)
 
         # Content tensor loss (pitches)
         # argmax is used to obtain token ids from onehot rep
@@ -350,6 +355,32 @@ class PolyphemusTrainer():
         }
 
         return tot_loss, losses
+    
+    def _masked_bce_loss(self, s_tensor, s_logits):
+        """
+        Computes the Binary Cross-Entropy loss with masking based on a padding value.
+
+        Parameters:
+        - s_tensor (Tensor): Ground truth tensor of shape (batch_size, seq_len, channels)
+        - s_logits (Tensor): Predicted tensor of shape (batch_size, seq_len, channels)
+
+        Returns:
+        - loss (Tensor): The mean BCE loss over the non-padded elements
+        """
+        # Create a mask where y_true is not equal to the padding value
+        mask = (s_tensor != constants.STRUCTURE_PAD).float()
+
+        # Compute the BCE loss for each element in the sequence
+        bce_loss = self.bce_unreduced(s_logits, s_tensor)
+        # bce_loss = F.binary_cross_entropy(y_pred, y_true, reduction='none')
+
+        # Apply the mask to the BCE loss
+        masked_bce_loss = bce_loss * mask
+
+        # Compute the mean loss, considering only the non-padded elements
+        loss = masked_bce_loss.sum() / mask.sum()
+
+        return loss
 
     def _accuracies(self, s_tensor, s_logits, c_tensor, c_logits, 
                     # is_drum
@@ -493,10 +524,14 @@ class PolyphemusTrainer():
         return torch.sum(s_logits == s_tensor) / s_tensor.numel()
 
     def _structure_precision(self, s_logits, s_tensor):
+        
+        # print(f"precision: s_logits bef sigmoid: {s_logits}")
 
         s_logits = torch.sigmoid(s_logits)
         s_logits[s_logits < 0.5] = 0
         s_logits[s_logits >= 0.5] = 1
+        
+        # print(f"precision: s_logits aft sigmoid: {s_logits}")
 
         tp = torch.sum(s_tensor[s_logits == 1])
 
