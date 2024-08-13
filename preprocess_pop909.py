@@ -56,17 +56,25 @@ def split_song_into_phrases(pproll_song, phrases, resolution):
         phrase_song.tracks = phrase_tracks
         for idx, track_type in enumerate(["MELODY", "BRIDGE", "PIANO"]):
             phrase_song.tracks[idx].name = track_type
-        phrase_songs.append(phrase_song)
+        phrase_songs.append((phrase_song, num_bars)) # store a tuple (muspy phrase, num of bars in each phrase)
         start_bar_idx += num_bars
         
     return phrase_songs
 
 
-def process_track_notes(tracks_notes, resolution):
+def process_track_notes(tracks_notes, resolution, phrase_len):
     tracks_content = []
     tracks_structure = []
 
     max_phrase_len_res = 4*resolution*constants.MAX_PHRASE_LEN # tokens in max number of bars
+
+    first_note = np.inf
+    for notes in tracks_notes:
+        track_first_note = min(note.time for note in notes) if notes else np.inf
+        first_note = min(first_note, track_first_note)
+
+    # Calculate time offset from first note (ASSUME first note is in first bar)
+    t_offset = (first_note//(resolution*4)) * resolution*4
 
     for notes in tracks_notes:
 
@@ -90,17 +98,17 @@ def process_track_notes(tracks_notes, resolution):
         # Todo: np.put_along_axis?
         for note in notes:
             # Insert note in the lowest position available in the timestep
-
-            t = note.time%max_phrase_len_res
-            
-            # if t >= max_phrase_len_res:
-            #     # Skip note if it exceeds max phrase length
-            #     continue
+                
+            t = note.time - t_offset
+            # t = note.time%max_phrase_len_res
+            if t >= max_phrase_len_res:
+                # Skip note if time index exceeds max phrase length
+                continue
 
             if notes_counter[t] >= constants.MAX_SIMU_TOKENS-1:
                 # Skip note if there is no more space
                 continue
-
+                
             pitch = max(min(note.pitch, constants.MAX_PITCH_TOKEN), 0)
             track_content[t, notes_counter[t], 0] = pitch
             dur = max(min(note.duration, constants.MAX_DUR_TOKEN + 1), 1)
@@ -115,7 +123,10 @@ def process_track_notes(tracks_notes, resolution):
         # Get track activations, a boolean tensor indicating whether notes
         # are being played in a timestep (sustain does not count)
         # (needed for graph rep.)
-        activations = np.array(notes_counter-1, dtype=bool)
+        activations = np.array(notes_counter-1, dtype=bool).astype(int)
+        # Mask activations
+        activations[4*resolution*phrase_len:] = constants.STRUCTURE_PAD
+        # print(f"Padding after {phrase_len} bars: {activations}")
 
         tracks_content.append(track_content)
         tracks_structure.append(activations)
@@ -159,11 +170,24 @@ def preprocess_midi_file(midi_dataset_dir, song_idx, structure_dir, dest_dir, n_
             phrase_songs = split_song_into_phrases(pproll_song, phrases, resolution)
             # print(f"Phrase songs length: {len(phrase_songs)}")
 
-            for phrase_song in phrase_songs:
+            for phrase_song, phrase_len in phrase_songs:
 
                 tracks_notes = [track.notes for track in phrase_song.tracks]
-                c_tensor, s_tensor = process_track_notes(tracks_notes, resolution)
+                c_tensor, s_tensor = process_track_notes(tracks_notes, resolution, phrase_len)
                 # print(f"C tensor shape: {c_tensor.shape}, S tensor shape: {s_tensor.shape}")
+                
+                # Skip sequence if it contains more than one bar of consecutive
+                # silence in at least one track
+                bars = s_tensor.reshape(s_tensor.shape[0], n_bars, -1)
+                bars_acts = np.any(bars, axis=2)
+
+                # if 1 in np.diff(np.where(bars_acts == 0)[1]):
+                #     continue
+
+                # Skip sequence if it contains one bar of complete silence
+                silences = np.logical_not(np.any(bars_acts, axis=0))
+                if np.any(silences):
+                    continue
 
                 # Save sample (content and structure) to file
                 filename = os.path.basename(midi_filepath)
@@ -175,8 +199,8 @@ def preprocess_midi_file(midi_dataset_dir, song_idx, structure_dir, dest_dir, n_
 
                 saved_samples += 1
                 
-        except:
-            print(f"Skipped {midi_filepath}")
+        except Exception as e:
+            print(f"Skipped {midi_filepath}: Error: {e}")
             continue
 
     
