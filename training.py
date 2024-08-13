@@ -319,7 +319,7 @@ class PolyphemusTrainer():
         # s_loss = torch.mean(s_loss)
         
         s_loss = self._masked_bce_loss(
-            s_logits.view(-1), s_tensor.view(-1).float())
+            s_tensor.view(-1).float(), s_logits.view(-1))
 
         # Content tensor loss (pitches)
         # argmax is used to obtain token ids from onehot rep
@@ -369,13 +369,17 @@ class PolyphemusTrainer():
         """
         # Create a mask where y_true is not equal to the padding value
         mask = (s_tensor != constants.STRUCTURE_PAD).float()
+        # print(f"s_tensor: {s_tensor}")
+        # print(f"mask: {mask}")
 
         # Compute the BCE loss for each element in the sequence
         bce_loss = self.bce_unreduced(s_logits, s_tensor)
         # bce_loss = F.binary_cross_entropy(y_pred, y_true, reduction='none')
+        # print(f"bce_loss bef mask: {bce_loss}")
 
         # Apply the mask to the BCE loss
         masked_bce_loss = bce_loss * mask
+        # print(f"bce_loss aft mask: {masked_bce_loss}")
 
         # Compute the mean loss, considering only the non-padded elements
         loss = masked_bce_loss.sum() / mask.sum()
@@ -517,6 +521,9 @@ class PolyphemusTrainer():
         s_logits = torch.sigmoid(s_logits)
         s_logits[s_logits < 0.5] = 0
         s_logits[s_logits >= 0.5] = 1
+
+        mask = (s_tensor != constants.STRUCTURE_PAD).float()
+        s_logits = s_logits * mask
         
         # print(f"s_logits after sigmoid: {s_logits}")
         # print(f"sum of matching structure elements: {torch.sum(s_logits == s_tensor)}")
@@ -530,6 +537,9 @@ class PolyphemusTrainer():
         s_logits = torch.sigmoid(s_logits)
         s_logits[s_logits < 0.5] = 0
         s_logits[s_logits >= 0.5] = 1
+
+        mask = (s_tensor != constants.STRUCTURE_PAD).float()
+        s_logits = s_logits * mask
         
         # print(f"precision: s_logits aft sigmoid: {s_logits}")
 
@@ -542,6 +552,9 @@ class PolyphemusTrainer():
         s_logits = torch.sigmoid(s_logits)
         s_logits[s_logits < 0.5] = 0
         s_logits[s_logits >= 0.5] = 1
+
+        mask = (s_tensor != constants.STRUCTURE_PAD).float()
+        s_logits = s_logits * mask
 
         tp = torch.sum(s_tensor[s_logits == 1])
 
