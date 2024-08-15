@@ -248,13 +248,14 @@ class PolyphemusDataset(Dataset):
         sample_path = os.path.join(self.dir, self.files[idx].name)
         data = np.load(sample_path)
         c_tensor = torch.tensor(data["c_tensor"], dtype=torch.long)
-        s_tensor = torch.tensor(data["s_tensor"], dtype=torch.int)
+        s_tensor = torch.tensor(data["s_tensor"], dtype=torch.int8)
         # print(f"loaded c_tensor shape: {c_tensor.shape}")
         # print(f"loaded s_tensor shape: {s_tensor.shape}")
 
         # From (n_tracks x n_timesteps x ...)
         # to (n_bars x n_tracks x n_timesteps x ...)
-        # print(c_tensor.shape) # 3 x 256 x 16 x 2 --> [3, 8, -1, 16, 2]
+        print(c_tensor.shape) # 3 x 256 x 16 x 2 --> [3, 8, -1, 16, 2]
+        
         c_tensor = c_tensor.reshape(c_tensor.shape[0], self.n_bars, -1,
                                     c_tensor.shape[2], c_tensor.shape[3])
         c_tensor = c_tensor.permute(1, 0, 2, 3, 4)

@@ -23,6 +23,27 @@ def split_string(s):
     matches = pattern.findall(s)
     return matches
 
+def split_phrase_string_to_max(phrases):
+    """
+    Split a list of phrases into maximum bar length
+    E.g. If max_bar_len = 4, ['i3', 'A4', 'B8', 'A4', 'o4'] --> ['i3', 'A4', 'B4', 'B4', 'A4', 'o4']
+    """
+    split_phrases = []
+    for phrase in phrases:
+        num_bars = int(phrase[1:])
+        
+        if num_bars > constants.MAX_PHRASE_LEN:
+            n_splits = num_bars//constants.MAX_PHRASE_LEN
+            # Add n_splits phrases of max length
+            split_phrases.extend([f"{phrase[:1]}{constants.MAX_PHRASE_LEN}"]*(n_splits))
+            # Add remaining number of bars
+            split_phrases.append(f"{phrase[:1]}{num_bars%constants.MAX_PHRASE_LEN}")
+        
+        else:
+            split_phrases.append(phrase)
+            
+    return split_phrases
+
 
 def split_song_into_phrases(pproll_song, phrases, resolution):
     muspy_conv = muspy.from_pypianoroll(pproll_song)
@@ -166,29 +187,39 @@ def preprocess_midi_file(midi_dataset_dir, song_idx, structure_dir, dest_dir, n_
             phrases = split_string(structure)
             # print(f"Structure: {structure}")
             # print(f"Phrase length: {len(phrases)}")
+            
+            phrases = split_phrase_string_to_max(phrases)
 
             phrase_songs = split_song_into_phrases(pproll_song, phrases, resolution)
             # print(f"Phrase songs length: {len(phrase_songs)}")
 
             for phrase_song, phrase_len in phrase_songs:
+                
 
                 tracks_notes = [track.notes for track in phrase_song.tracks]
                 c_tensor, s_tensor = process_track_notes(tracks_notes, resolution, phrase_len)
                 # print(f"C tensor shape: {c_tensor.shape}, S tensor shape: {s_tensor.shape}")
                 
+                # print(f"Checking for silences in phrase_length {phrase_len}: {s_tensor}")
                 # Skip sequence if it contains more than one bar of consecutive
-                # silence in at least one track
+                # silence in at least one track (not including PAD)
                 bars = s_tensor.reshape(s_tensor.shape[0], n_bars, -1)
-                bars_acts = np.any(bars, axis=2)
+                # bars_acts = np.any((bars!=0), axis=2)
+                bars_acts = np.any((bars==1), axis=2)
+                # print(f"bar activations in {n_bars} bars: {bars_acts}")
+                
 
-                # if 1 in np.diff(np.where(bars_acts == 0)[1]):
-                #     continue
-
-                # Skip sequence if it contains one bar of complete silence
-                silences = np.logical_not(np.any(bars_acts, axis=0))
-                if np.any(silences):
+                if 1 in np.diff(np.where(bars_acts == 0)[1]):
+                    # print(f"more than one bar of consecutive silence!")
                     continue
 
+                # Skip sequence if it contains one bar of complete silence (not including PAD)
+                silences = np.logical_not(np.any(bars_acts, axis=0))
+                if np.any(silences):
+                    # print(f"more than one bar of complete silence!")
+                    continue
+                    
+                
                 # Save sample (content and structure) to file
                 filename = os.path.basename(midi_filepath)
 

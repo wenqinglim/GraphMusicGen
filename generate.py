@@ -22,12 +22,14 @@ def generate_music(vae, z, s_cond=None, s_tensor_cond=None):
 
     # Decoder pass to get structure and content logits
     s_logits, c_logits = vae.decoder(z, s_cond)
+    # print(f"s_logits from vae decoder: {s_logits}")
 
     if s_tensor_cond is not None:
         s_tensor = s_tensor_cond
     else:
         # Compute binary structure tensor from logits
         s_tensor = vae.decoder._binary_from_logits(s_logits)
+        # print(f"s_tensor from logits: {s_tensor}")
 
     # Build (n_batches x n_bars x n_tracks x n_timesteps x Sigma x d_token)
     # multitrack pianoroll tensor containing logits for each activation and
@@ -67,6 +69,7 @@ def save(mtp, dir, s_tensor=None, n_loops=1, audio=True,
             plot_pianoroll(muspy_song, save_dir)
 
         if plot_struct:
+            print(s_tensor[i].shape)
             plot_structure(s_tensor[i].cpu(), save_dir)
 
         if n_loops > 1:
@@ -247,7 +250,7 @@ def main():
 
     print()
     print("Saving MIDI files in {}...\n".format(output_dir))
-    save(mtp, output_dir, s_tensor, args.n_loops, audio)
+    save(mtp, output_dir, s_tensor, args.n_loops, audio, plot_proll=True, plot_struct=True)
     print("Finished saving MIDI files.")
     print_divider()
 

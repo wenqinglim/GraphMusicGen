@@ -456,7 +456,7 @@ class StructureEncoder(nn.Module):
         s_tensor = graph.s_tensor
         # print(f"s_tensor shape: {s_tensor.shape}") # 2048 x 3 x 32
         out = self.cnn_encoder(s_tensor.view(-1, constants.N_TRACKS,
-                                             self.resolution * 4)) # 2048 x 3 x 32
+                                             int(self.resolution * 4))) # 2048 x 3 x 32
         
         # out: 1536 x 512
         # print(f"out shape: {out.shape}")

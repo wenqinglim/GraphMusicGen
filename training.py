@@ -122,11 +122,12 @@ class PolyphemusTrainer():
         self.model.train()
         scaler = torch.cuda.amp.GradScaler() if self.cuda else None
         self.optimizer.zero_grad()
-        progress_bar = tqdm(range(len(trainloader)))
+        # progress_bar = tqdm(range(len(trainloader)))
 
         for epoch in range(epochs):
             self.cur_epoch = epoch
             for batch_idx, graph in enumerate(trainloader):
+                batch_start_time = time.time()
                 self.cur_batch_idx = batch_idx
 
                 # Move batch of graphs to device. Note: a single graph here
@@ -231,7 +232,7 @@ class PolyphemusTrainer():
 
                     self.model.train()
 
-                progress_bar.update(1)
+                # progress_bar.update(1)
 
                 # Save model and stats on disk
                 if (self.save_every > 0 and

@@ -1,12 +1,14 @@
 from enum import Enum
 
-
+N_TYPES = 2 # For structure gen
 N_TRACKS = 3
 # TRACKS = ['Drums', 'Bass', 'Guitar', 'Strings']
 
 TRACKS = ['Melody', 'Bridge', 'Piano']
 
-MAX_PHRASE_LEN = 8
+# MAX_PHRASE_LEN = 8
+MAX_PHRASE_LEN = 4
+
 
 
 # These defaults, which should not be changed, are set when the related 
@@ -57,6 +59,7 @@ D_TOKEN_PAIR = N_PITCH_TOKENS + N_DUR_TOKENS
 
 # Number of maximum tokens stored in each timestep (14 + SOS and EOS)
 MAX_SIMU_TOKENS = 16
+MAX_SIMU_PHRASE_TOKENS = 3
 
 STRUCTURE_PAD = 2
 
@@ -69,5 +72,29 @@ class EdgeTypes(Enum):
 
 # N_TRACKS track types + 1 onset edge type + 1 next edge type
 N_EDGE_TYPES = N_TRACKS + 2
+
+
+# Structure Gen Constants
+MAX_STRUCTURE_LEN = 12
+
+class IdToken(Enum):
+    SOS = 12
+    EOS = 13
+    PAD = 14
+
+
+N_ID_TOKENS = 15
+MAX_ID_TOKEN = 11
+
+
+# Length tokens have values in the range [0, 19].
+class LengthToken(Enum):
+    SOS = 17
+    EOS = 18
+    PAD = 19
+
+
+N_LEN_TOKENS = 20
+MAX_LEN_TOKEN = 16
 
 
