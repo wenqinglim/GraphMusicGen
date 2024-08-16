@@ -78,13 +78,28 @@ N_EDGE_TYPES = N_TRACKS + 2
 MAX_STRUCTURE_LEN = 12
 
 class IdToken(Enum):
-    SOS = 12
-    EOS = 13
-    PAD = 14
+    SOS = 13
+    EOS = 14
+    PAD = 15
 
+id_tokens = {
+    'i': 0, 
+    'A': 1, 
+    'B': 2, 
+    'C': 3, 
+    'D': 4, 
+    'E': 5,
+    'a': 6, 
+    'b': 7, 
+    'c': 8, 
+    'd': 9, 
+    'X': 10, 
+    'x': 11, 
+    'o': 12, 
+}
 
-N_ID_TOKENS = 15
-MAX_ID_TOKEN = 11
+N_ID_TOKENS = 16
+MAX_ID_TOKEN = 12
 
 
 # Length tokens have values in the range [0, 19].
