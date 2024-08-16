@@ -196,6 +196,7 @@ def graph_from_tensor(s_tensor):
 
         # Add one hot timestep distance to edge attributes
         edge_attrs = torch.zeros(attrs.size(0), s_tensor.shape[-1] + 1)
+        # print(f"s_tensor shape [-1]: {s_tensor.shape[-1]}, edge_attrs.shape: {edge_attrs.shape}")
         edge_attrs[:, 0] = attrs[:, 0]
         edge_attrs[torch.arange(edge_attrs.size(0)),
                    attrs.long()[:, 1] + 1] = 1

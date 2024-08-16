@@ -148,16 +148,21 @@ def main():
     split = random_split(dataset, lengths)
     tr_set = split[0]
     vl_set = split[1] if args.eval else None
+    ts_set = split[2] if args.eval else None
 
     trainloader = DataLoader(tr_set, batch_size=batch_size, shuffle=True, 
                              num_workers=args.num_workers)
     if args.eval:
         validloader = DataLoader(vl_set, batch_size=batch_size, shuffle=False,
                                  num_workers=args.num_workers)
+        testloader = DataLoader(ts_set, batch_size=batch_size, shuffle=False,
+                                 num_workers=args.num_workers)
         eval_every = len(trainloader)
+        
     else:
         validloader = None
         eval_every = None
+        testloader = None
 
     
     model_name = (args.model_name if args.model_name is not None 
@@ -205,6 +210,20 @@ def main():
         device=device
     )
     trainer.train(trainloader, validloader=validloader, epochs=args.max_epochs)
+    
+    # Evaluate on test set
+    test_losses, test_accuracies = trainer.evaluate(testloader)
+    print("Test losses:")
+    print(test_losses)
+    print("Test accuracies:")
+    print(test_accuracies)
+    
+    torch.save({"test_losses": test_losses,
+                "test_accuracies": test_accuracies,
+                # "test_set": ts_set,
+    }, os.path.join(model_dir, "test_metrics"))
+    
+    
 
 
 if __name__ == '__main__':

@@ -38,7 +38,7 @@ def process_phrases(phrases):
     c_tensor[:, :, 0, 1] = LengthToken.SOS.value
     
     
-    added_phrases = {}
+    # added_phrases = {}
         
     for idx, phrase in enumerate(phrases):
         if idx >= constants.MAX_STRUCTURE_LEN:
@@ -46,25 +46,30 @@ def process_phrases(phrases):
             
         melodic_idx = int(is_melodic(phrase)) # melodic: 1; non-melodic: 0
         empty_idx = int(~is_melodic(phrase))
+
             
         # Add structure activation
         # print(s_tensor)
         s_tensor[melodic_idx, idx] = 1
         
         # Add content repetition
-        if phrase in added_phrases.keys():
-            phrase_id = added_phrases[phrase]
-        else:
-            # Assign new phrase_id to phrase
-            phrase_id = len(added_phrases)
-            added_phrases[phrase] = phrase_id
+        # if phrase in added_phrases.keys():
+        #     phrase_id = added_phrases[phrase]
+        # else:
+        #     # Assign new phrase_id to phrase
+        #     phrase_id = len(added_phrases)
+        #     added_phrases[phrase] = phrase_id
             
-        phrase_id = min(phrase_id, constants.MAX_ID_TOKEN)
+        phrase_id = constants.id_tokens[phrase[0]]
+            
+        # phrase_id = min(phrase_id, constants.MAX_ID_TOKEN)
         c_tensor[melodic_idx, idx, 1, 0] = phrase_id
 
         # Add content n_bars
         n_bars = min(int(phrase[1:]), constants.MAX_LEN_TOKEN)
         c_tensor[melodic_idx, idx, 1, 1] = n_bars
+        
+        print(f"phrase: {phrase} is encoded as phrase_id: {phrase_id}, n_bars {n_bars}")
         
 
         c_tensor[melodic_idx, idx, 2, 0] = IdToken.EOS.value

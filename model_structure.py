@@ -169,7 +169,7 @@ class MLP(nn.Module):
 class GCN(nn.Module):
 
     def __init__(self, input_dim=256, hidden_dim=256, n_layers=3,
-                 num_relations=3, num_dists=32, batch_norm=False, dropout=0.1):
+                 num_relations=3, num_dists=12, batch_norm=False, dropout=0.1):
         super().__init__()
 
         self.layers = nn.ModuleList()
@@ -199,9 +199,9 @@ class GCN(nn.Module):
 
             residual = x
             x = F.dropout(x, p=self.p, training=self.training)
-            print(f"input GCN: {x}, {edge_index}, {edge_type}, {edge_attr}")
-            print(f"edge_index max: {edge_index.max()}, x size: {x.size(0)}")
-            print(f"edge_type size: {edge_type.shape}, edge_attr size: {edge_attr.shape}")
+            # print(f"input GCN: {x}, {edge_index}, {edge_type}, {edge_attr}")
+            # print(f"edge_index max: {edge_index.max()}, x size: {x.size(0)}")
+            # print(f"edge_type size: {edge_type.shape}, edge_attr size: {edge_attr.shape}")
             x = self.layers[i](x, edge_index, edge_type, edge_attr)
 
             if self.batch_norm:
@@ -249,28 +249,51 @@ class CNNEncoder(nn.Module):
         self.flatten = nn.Flatten(start_dim=1)
 
         # Linear layers
+#         self.lin = nn.Sequential(
+#             # nn.Dropout(dropout),
+#             # nn.Linear(16 * 4 * 8, dense_dim),
+#             # nn.Linear(16 * constants.N_TYPES * 8, dense_dim),
+#             nn.Linear(12 * constants.N_TYPES, dense_dim),
+#             nn.ReLU(True),
+#             nn.Dropout(dropout),
+#             nn.Linear(dense_dim, output_dim)
+            
+#         )
+        
+        # Linear layers
         self.lin = nn.Sequential(
-            # nn.Dropout(dropout),
+            nn.Dropout(dropout),
             # nn.Linear(16 * 4 * 8, dense_dim),
-            # nn.Linear(16 * constants.N_TYPES * 8, dense_dim),
-            nn.Linear(constants.N_TYPES * 1, dense_dim),
+            nn.Linear(16 * constants.N_TYPES * 3, dense_dim),
             nn.ReLU(True),
             nn.Dropout(dropout),
             nn.Linear(dense_dim, output_dim)
         )
-
+        
     def forward(self, x):
-        # x = x.unsqueeze(1)
-        # print(f"Shape bef lin: {x.shape}")
+        x = x.unsqueeze(1)
+        # print(f"Shape bef conv: {x.shape}")
 
-        # x = self.conv(x) # 1536 x 16 x 4 x 8
+        x = self.conv(x) # 1536 x 16 x 4 x 8
         # print(f"Shape after conv: {x.shape}")
 
-        # x = self.flatten(x)
-        print(f"Shape bef lin: {x.shape}") #  96 x 2 x 1
-        x = self.lin(x.permute(0, 2, 1))
-        print(f"Shape aft lin: {x.shape}")
+        x = self.flatten(x)
+        x = self.lin(x)
         return x
+
+#     def forward(self, x):
+#         # x = x.unsqueeze(1)
+#         # print(f"Shape bef lin: {x.shape}")
+
+#         # x = self.conv(x) # 1536 x 16 x 4 x 8
+#         # print(f"Shape after conv: {x.shape}")
+
+#         x = self.flatten(x)
+#         print(f"Shape bef lin: {x.shape}") #  8 x 2 x 12
+#         x = self.lin(x)
+#         # x = self.lin(x.permute(0, 2, 1))
+#         print(f"Shape aft lin: {x.shape}") # 8 x 1 x 128
+#         return x
 
 
 class CNNDecoder(nn.Module):
@@ -286,11 +309,11 @@ class CNNDecoder(nn.Module):
             nn.ReLU(True),
             nn.Dropout(dropout),
             # nn.Linear(dense_dim, 16 * 4 * 8),
-            nn.Linear(dense_dim, 16 * constants.N_TYPES * 8),
+            nn.Linear(dense_dim, 16 * constants.N_TYPES * 3),
             nn.ReLU(True)
         )
 
-        self.unflatten = nn.Unflatten(dim=1, unflattened_size=(16, constants.N_TYPES, 8))
+        self.unflatten = nn.Unflatten(dim=1, unflattened_size=(16, constants.N_TYPES, 3))
 
         # Upsample and convolutional layers
         if batch_norm:
@@ -312,7 +335,7 @@ class CNNDecoder(nn.Module):
     def forward(self, x):
         x = self.lin(x)
         x = self.unflatten(x)
-        print(x.shape)
+        # print(f"cnn decoder x shape bef conv: {x.shape}")
         x = self.conv(x)
         x = x.unsqueeze(1)
         return x
@@ -363,7 +386,7 @@ class ContentEncoder(nn.Module):
     def forward(self, graph):
         
         c_tensor = graph.c_tensor
-        print(f"c_tensor shape: {c_tensor.shape}")
+        # print(f"c_tensor shape: {c_tensor.shape}")
         # print(f"s_tensor: {graph.s_tensor[graph.s_tensor==2]}")
 
         # Discard SOS token
@@ -423,6 +446,7 @@ class ContentEncoder(nn.Module):
         # Set initial graph node states to intermediate chord representations 
         # and pass through GCN
         graph.x = out
+        # print(f"out shape bef graph enc: {out.shape}") # 96 x 128
         graph.distinct_bars = graph.bars + self.n_bars*graph.batch
         out = self.graph_encoder(graph)
         # print(f"out shape after graph enc: {out.shape}")
@@ -459,9 +483,9 @@ class StructureEncoder(nn.Module):
     def forward(self, graph):
         
         s_tensor = graph.s_tensor
-        print(f"s_tensor shape: {s_tensor.shape}") # 2048 x 3 x 32
+        # print(f"s_tensor shape: {s_tensor.shape}") # 2048 x 3 x 32
         out = self.cnn_encoder(s_tensor.view(-1, constants.N_TYPES,
-                                             int(self.resolution * 4))) # 2048 x 3 x 32
+                                             int(self.resolution))) # 2048 x 3 x 32
         
         # out: 1536 x 512
         # print(f"out shape: {out.shape}")
@@ -605,6 +629,7 @@ class ContentDecoder(nn.Module):
         non_drums_dur = self.dur_emb(non_drums[..., self.d//2:])
         non_drums = torch.cat((non_drums_pitch, non_drums_dur), dim=-1)
         # n_nodes_non_drums x MAX_SIMU_TOKENS x d_token
+        
 
         # Merge drums and non-drums in the final output tensor
         # d_token = constants.D_TOKEN_PAIR
@@ -612,8 +637,8 @@ class ContentDecoder(nn.Module):
         #                   device=self.device, dtype=drums.dtype)
         # out[s.is_drum] = drums
         # out[torch.logical_not(s.is_drum)] = non_drums
+        
         out = non_drums
-
         return out
 
 
