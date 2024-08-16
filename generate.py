@@ -46,12 +46,19 @@ def save(mtp, dir, s_tensor=None, n_loops=1, audio=True,
     resolution = mtp.size(3) // 4
     # Clear matplotlib cache (this solves formatting problems with first plot)
     plt.clf()
+    
+    os.makedirs(dir, exist_ok=True)
+    if os.listdir(dir):
+        print(f"list dir: {os.listdir(dir)}")
+        curr_max_idx = max([eval(dir_num) for dir_num in os.listdir(dir)])
+    else:
+        curr_max_idx = -1
 
     # Iterate over batches
     for i in range(mtp.size(0)):
 
         # Create the directory if it does not exist
-        save_dir = os.path.join(dir, str(i))
+        save_dir = os.path.join(dir, str(i+curr_max_idx+1))
         os.makedirs(save_dir, exist_ok=True)
 
         if not looped_only:
