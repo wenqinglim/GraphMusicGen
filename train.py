@@ -11,7 +11,8 @@ from data import PolyphemusDataset
 import torch.optim as optim
 
 from model import VAE
-from utils import set_seed, print_params, print_divider
+from generate import save, load_model
+from utils import set_seed, print_params, print_divider, mtp_from_logits
 from training import PolyphemusTrainer, ExpDecayLRScheduler, StepBetaScheduler
 
 
@@ -34,6 +35,16 @@ def main():
         'config_file',
         type=str,
         help='Path to the JSON training configuration file.'
+    )
+    parser.add_argument(
+        'test_music_dir',
+        type=str,
+        help='Directory to save the generated output from test set.'
+    )
+    parser.add_argument(
+        'orig_music_dir',
+        type=str,
+        help='Directory to save the original music constructed from test set.'
     )
     parser.add_argument(
         '--model_name',
@@ -96,7 +107,7 @@ def main():
     parser.add_argument(
         '--vl_split',
         type=float,
-        default='0.1',
+        default='0.2',
         help="Percentage of samples in the dataset used for the validation "
         "split. Default is 0.1. This value is ignored if the --eval option is "
         "not specified."
@@ -148,6 +159,7 @@ def main():
     split = random_split(dataset, lengths)
     tr_set = split[0]
     vl_set = split[1] if args.eval else None
+    ts_set = split[2] if args.eval else None
 
     trainloader = DataLoader(tr_set, batch_size=batch_size, shuffle=True, 
                              num_workers=args.num_workers)
@@ -155,9 +167,12 @@ def main():
         validloader = DataLoader(vl_set, batch_size=batch_size, shuffle=False,
                                  num_workers=args.num_workers)
         eval_every = len(trainloader)
+        testloader = DataLoader(ts_set, batch_size=batch_size, shuffle=False,
+                                 num_workers=args.num_workers)
     else:
         validloader = None
         eval_every = None
+        testloader = None
 
     
     model_name = (args.model_name if args.model_name is not None 
@@ -205,6 +220,42 @@ def main():
         device=device
     )
     trainer.train(trainloader, validloader=validloader, epochs=args.max_epochs)
+    
+    # Evaluate on test set
+    test_losses, test_accuracies = trainer.evaluate(testloader)
+    print("Test losses:")
+    print(test_losses)
+    print("Test accuracies:")
+    print(test_accuracies)
+    
+    # Save music
+    saveloader = DataLoader(ts_set, batch_size=1, shuffle=False, num_workers=args.num_workers)
+                    
+    model, configuration = load_model(model_dir, device)
+
+    count = 0
+    for batch in saveloader:
+
+        mu, log_var = model.encoder(batch.to(device))
+
+        # Reparameterization trick
+        z = torch.exp(0.5 * log_var)
+        z = z * torch.randn_like(z)
+        z = z + mu
+
+        s_logits, c_logits = model.decoder(z, None)
+        s_tensor = model.decoder._binary_from_logits(s_logits)
+        mtp = mtp_from_logits(c_logits, s_tensor)
+        save(mtp, args.test_music_dir, s_tensor, 1, audio=True, plot_proll=True, plot_struct=True)
+
+        mtp_orig = mtp_from_logits(batch.c_tensor, batch.s_tensor.unsqueeze(0))
+        save(mtp_orig, args.orig_music_dir, batch.s_tensor.unsqueeze(0), 1, audio=True, plot_proll=True, plot_struct=True)
+
+        count += 1
+
+        if count >= 10:
+            break
+    
 
 
 if __name__ == '__main__':
