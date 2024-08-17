@@ -31,8 +31,8 @@ class StepBetaScheduler():
     def step(self):
         self.update_steps += 1
 
-        if (self.update_steps >= self.anneal_start or
-                self.update_steps < self.anneal_end):
+        if ((self.update_steps >= self.anneal_start) and
+                (self.update_steps < self.anneal_end)):
             # If we are annealing, update beta according to current step
             curr_step = (self.update_steps-self.anneal_start) // self.inc_every
             self.beta = self.step_size * (curr_step+1)
@@ -176,7 +176,7 @@ class PolyphemusTrainer():
                     if self.lr_scheduler is not None:
                         self.lr_scheduler.step()
                     if self.beta_scheduler is not None:
-                        self.beta_scheduler.step()
+                        self.beta = self.beta_scheduler.step()
 
                 # Compute accuracies
                 accs = self._accuracies(

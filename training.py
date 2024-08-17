@@ -25,17 +25,20 @@ class StepBetaScheduler():
 
         self.update_steps = 0
         self.beta = 0
-        n_steps = self.beta_max // self.step_size
-        self.inc_every = (self.anneal_end-self.anneal_start) // n_steps
+        n_steps = self.beta_max // self.step_size #10
+        self.inc_every = (self.anneal_end-self.anneal_start) // n_steps 
 
     def step(self):
         self.update_steps += 1
+        
+        # print(self.update_steps)
 
-        if (self.update_steps >= self.anneal_start or
-                self.update_steps < self.anneal_end):
+        if ((self.update_steps >= self.anneal_start) and
+                (self.update_steps < self.anneal_end)):
             # If we are annealing, update beta according to current step
             curr_step = (self.update_steps-self.anneal_start) // self.inc_every
             self.beta = self.step_size * (curr_step+1)
+            # print(f"ANNEALING! Beta: {self.beta}")
             
         return self.beta
 
@@ -176,7 +179,7 @@ class PolyphemusTrainer():
                     if self.lr_scheduler is not None:
                         self.lr_scheduler.step()
                     if self.beta_scheduler is not None:
-                        self.beta_scheduler.step()
+                        self.beta = self.beta_scheduler.step()
 
                 # Compute accuracies
                 accs = self._accuracies(
@@ -344,6 +347,7 @@ class PolyphemusTrainer():
         # Reconstruction loss and total loss
         rec_loss = pitch_loss + dur_loss + s_loss
         tot_loss = rec_loss + self.beta*kld_loss
+        # print(f"Beta: {self.beta}, KLD: {kld_loss}, beta*kld: {self.beta*kld_loss}")
 
         losses = {
             'tot': tot_loss.item(),
