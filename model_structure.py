@@ -26,7 +26,7 @@ def masked_edge_index(edge_index, edge_mask):
     # type: (SparseTensor, Tensor) -> SparseTensor
     pass
 
-
+# Why aren't these jitted?
 def masked_edge_index(edge_index, edge_mask):
     if isinstance(edge_index, Tensor):
         return edge_index[:, edge_mask]
@@ -57,23 +57,18 @@ class GCL(RGCNConv):
                 edge_attr: OptTensor = None):
 
         # Convert input features to a pair of node features or node indices.
-        x_l: OptTensor = None
-        if isinstance(x, tuple):
-            x_l = x[0]
-        else:
-            x_l = x
-        if x_l is None:
-            x_l = torch.arange(self.in_channels_l, device=self.weight.device)
+        x_l: OptTensor = x[0] if isinstance(x, tuple) else x
+        x_l = x_l if x_l is not None else torch.arange(self.in_channels_l, device=self.weight.device)
 
-        x_r: Tensor = x_l
-        if isinstance(x, tuple):
-            x_r = x[1]
+        x_r: Tensor = x[1] if isinstance(x, tuple) else x_l
 
         size = (x_l.size(0), x_r.size(0))
 
         if isinstance(edge_index, SparseTensor):
             edge_type = edge_index.storage.value()
-        assert edge_type is not None
+        
+        if edge_type is None:
+            raise ValueError('Edge type tensor is required.')
 
         # propagate_type: (x: Tensor)
         out = torch.zeros(x_r.size(0), self.out_channels, device=x_r.device)
@@ -111,9 +106,8 @@ class GCL(RGCNConv):
                                        edge_attr=attr)
                     out = out + (h @ weight[i])
 
-        root = self.root
-        if root is not None:
-            out += root[x_r] if x_r.dtype == torch.long else x_r @ root
+        if self.root is not None:
+            out += self.root[x_r] if x_r.dtype == torch.long else x_r @ self.root
 
         if self.bias is not None:
             out += self.bias
