@@ -14,3 +14,6 @@ python3 preprocess_pop909.py POP909 POP909_structure preprocessed_909 --n_worker
 # Training command
 python3 train.py preprocessed_909 models training.json --model_name POP8 --use_gpu
 
+# Generation command
+python3 generate.py models/POP8/ music/ --n 10 --n_loops 4
+
