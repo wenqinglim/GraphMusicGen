@@ -23,7 +23,7 @@ def set_seed(seed):
 
 
 def append_dict(dest_d, source_d):
-
+    # What if the key is not in the dictionary?
     for k, v in source_d.items():
         dest_d[k].append(v)
 
