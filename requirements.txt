@@ -1,29 +1,30 @@
 --find-links https://download.pytorch.org/whl/torch_stable.html
---find-links https://data.pyg.org/whl/torch-1.7.0+cu110.html
 --find-links https://data.pyg.org/whl/torch-1.13.0+cu116.html
 
-# new cuda version 12.4
+# With cuda version 12.4
 # PyTorch related
-# torch==1.7.0+cu121  # Note: changed cuda to 11.0 for nvidia gpu compatibility
-# torchvision==0.8.0
-# torch-geometric==2.0.2
-# torch-cluster==1.5.9
-# torch-scatter==2.0.7
-# torch-sparse==0.6.9
-# torch-spline-conv==1.2.1
-
-# Note: Use these instead
 torch==1.13.0+cu116
 torchaudio==0.13.0+cu116
+torch-geometric==2.0.2
 torchvision==0.14.0+cu116
-
+torch-cluster==1.6.1+pt113cu116
+torch-scatter==2.1.1+pt113cu116
+torch-sparse==0.6.17+pt113cu116
+torch-spline-conv==1.2.2+pt113cu116
+pyg-lib==0.2.0+pt113cu116
 
 # Music packages
 pretty-midi==0.2.9
+music21==7.3.3
 muspy==0.4.0
 pypianoroll==1.0.4
 
 # Various
+matplotlib==3.5.3
+numpy==1.21.6
+pandas==1.3.5
 prettytable==2.4.0
+scikit-learn==1.0.2
+scipy==1.7.3
 tqdm==4.62.3
 huggingface-hub==0.16.4
